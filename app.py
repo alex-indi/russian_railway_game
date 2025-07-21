@@ -185,6 +185,36 @@ def contract_price(contract):
     return s
 
 
+def calculate_current_price(contract):
+    """Вычисляет ТЕКУЩУЮ стоимость контракта с учетом штрафов за просрочку."""
+    base_price = contract_price(contract)
+    rounds_left = contract.get('rounds_left', contract['max_rounds'])
+    max_rounds = contract['max_rounds']
+
+    multiplier = 1.0
+
+    # Правила для простых контрактов
+    if contract['id'].startswith('P'):  # max_rounds = 3
+        if rounds_left <= 0:
+            multiplier = 0.0
+        elif rounds_left == 1:
+            multiplier = 0.3
+        elif rounds_left == 2:
+            multiplier = 0.6
+
+    # Правила для средних контрактов
+    elif contract['id'].startswith('M'):  # max_rounds = 2
+        if rounds_left <= 0:
+            multiplier = 0.0
+        elif rounds_left == 1:
+            multiplier = 0.5
+
+    # Правила для сложных контрактов
+    elif contract['id'].startswith('S'):  # max_rounds = 1
+        if rounds_left <= 0: multiplier = 0.0
+
+    return int(base_price * multiplier)
+
 def get_wagon_fill_html(contents, capacity):  # Аргумент переименован с hp на capacity
     html = ''
     for i in range(capacity):  # Используем capacity напрямую
@@ -343,12 +373,10 @@ def apply_event_effect(event):
     elif event_id == "E05":  # Обвал тоннеля
         st.session_state.money -= 1000
 
+
     elif event_id == "E06":  # Потеря груза
-        if st.session_state.active_contracts:
-            cheapest_contract = min(st.session_state.active_contracts, key=contract_price)
-            st.toast(f"Потерян контракт {cheapest_contract['id']}!", icon="📉")
-            unload_contract(cheapest_contract)  # Сначала выгружаем, потом удаляем
-            st.session_state.active_contracts.remove(cheapest_contract)
+        st.session_state.modifiers["revenue_multiplier"] = 0.5  # 0.5 означает 50% прибыли
+        st.toast("Событие: Потеря груза! Вся прибыль от разгрузки в этом раунде снижена на 50%.", icon="📉")
 
     elif event_id == "E07":  # Капитальный ремонт
         st.session_state.loco_hp = 3
@@ -452,6 +480,7 @@ if "round" not in st.session_state:
         "move_time_cost": 2,
         "load_unload_time_cost": 1,
         "can_take_contracts": True,
+        "revenue_multiplier": 1.0,  # 1.0 означает 100% прибыли
     }
 
     st.session_state.game_over = False
@@ -573,36 +602,37 @@ if st.session_state.moves_made_this_round == 0:
                         st.error("Недостаточно денег!")
 
 # --- Блок взятия контрактов ---
-st.subheader("Взять новый контракт")
-if len(st.session_state.active_contracts) >= 4:
-    st.warning("Вы не можете взять больше 4 контрактов одновременно.")
-else:
-    contract_cols = st.columns(3)
-    # Определяем доступные контракты для каждого типа
-    simple_contracts = [c for c in st.session_state.contracts_pool if c['id'].startswith('P')]
-    medium_contracts = [c for c in st.session_state.contracts_pool if c['id'].startswith('M')]
-    hard_contracts = [c for c in st.session_state.contracts_pool if c['id'].startswith('S')]
+if st.session_state.moves_made_this_round == 0:
+    st.subheader("Взять новый контракт")
+    if len(st.session_state.active_contracts) >= 4:
+        st.warning("Вы не можете взять больше 4 контрактов одновременно.")
+    else:
+        contract_cols = st.columns(3)
+        # Определяем доступные контракты для каждого типа
+        simple_contracts = [c for c in st.session_state.contracts_pool if c['id'].startswith('P')]
+        medium_contracts = [c for c in st.session_state.contracts_pool if c['id'].startswith('M')]
+        hard_contracts = [c for c in st.session_state.contracts_pool if c['id'].startswith('S')]
 
 
-    def take_contract(contract_list):
-        if contract_list:
-            chosen_contract = random.choice(contract_list)
-            chosen_contract['is_loaded'] = False  # Новый флаг статуса
-            chosen_contract['rounds_left'] = chosen_contract['max_rounds']
-            st.session_state.active_contracts.append(chosen_contract)
-            st.session_state.contracts_pool.remove(chosen_contract)
-            st.rerun()
+        def take_contract(contract_list):
+            if contract_list:
+                chosen_contract = random.choice(contract_list)
+                chosen_contract['is_loaded'] = False  # Новый флаг статуса
+                chosen_contract['rounds_left'] = chosen_contract['max_rounds']
+                st.session_state.active_contracts.append(chosen_contract)
+                st.session_state.contracts_pool.remove(chosen_contract)
+                st.rerun()
 
 
-    with contract_cols[0]:
-        if st.button(f"Простой ({len(simple_contracts)} шт.)", disabled=not st.session_state.modifiers['can_take_contracts']):
-            take_contract(simple_contracts)
-    with contract_cols[1]:
-        if st.button(f"Средний ({len(medium_contracts)} шт.)", disabled=not st.session_state.modifiers['can_take_contracts']):
-            take_contract(medium_contracts)
-    with contract_cols[2]:
-        if st.button(f"Сложный ({len(hard_contracts)} шт.)", disabled=not st.session_state.modifiers['can_take_contracts']):
-            take_contract(hard_contracts)
+        with contract_cols[0]:
+            if st.button(f"Простой ({len(simple_contracts)} шт.)", disabled=not st.session_state.modifiers['can_take_contracts']):
+                take_contract(simple_contracts)
+        with contract_cols[1]:
+            if st.button(f"Средний ({len(medium_contracts)} шт.)", disabled=not st.session_state.modifiers['can_take_contracts']):
+                take_contract(medium_contracts)
+        with contract_cols[2]:
+            if st.button(f"Сложный ({len(hard_contracts)} шт.)", disabled=not st.session_state.modifiers['can_take_contracts']):
+                take_contract(hard_contracts)
 
 st.markdown("---")
 
@@ -632,7 +662,7 @@ else:
         act_cols[1].markdown(
             f"{contract['origin']} → {contract['destination']} <span style='color:{status_color};'>●</span>",
             unsafe_allow_html=True)
-        act_cols[2].markdown(f"{goods_str} ({contract_price(contract)}₽)")
+        act_cols[2].markdown(f"{goods_str} ({calculate_current_price(contract)}₽)")
         act_cols[3].markdown(f"{contract['rounds_left']}")
 
         with act_cols[4]:
@@ -656,11 +686,14 @@ else:
                     else:
                         st.error("Недостаточно места в вагонах!")
 
-            # Логика кнопки "Разгрузка" (остается без изменений)
+            # Логика кнопки "Разгрузка"
             if contract['is_loaded'] and st.session_state.station == contract['destination']:
                 if st.button("Разгрузка", key=f"unload_{contract['id']}"):
                     unload_contract(contract)
-                    st.session_state.money += contract_price(contract)
+                    # Рассчитываем итоговую прибыль с учетом модификатора
+                    current_price = calculate_current_price(contract)
+                    revenue = int(current_price * st.session_state.modifiers["revenue_multiplier"])
+                    st.session_state.money += revenue
                     st.session_state.completed_contracts.append(contract)
                     st.session_state.active_contracts.remove(contract)
                     st.session_state.time = max(0, st.session_state.time - st.session_state.modifiers[
@@ -706,6 +739,7 @@ if main_action_cols[2].button("Конец раунда (следующий)",
         "move_time_cost": 2,
         "load_unload_time_cost": 1,
         "can_take_contracts": True,
+        "revenue_multiplier": 1.0,  # 1.0 означает 100% прибыли
     }
 
     # 2. Проверяем, не закончились ли события в "колоде".
