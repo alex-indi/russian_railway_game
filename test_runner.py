@@ -3,8 +3,6 @@ import game_engine as ge
 import pandas as pd
 from tqdm import tqdm
 import random
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 NUM_SIMULATIONS_PER_STRATEGY = 1000  # Количество игр для каждой стратегии
 
@@ -176,9 +174,6 @@ def make_decision_exploiter(state):
                                 # Если хватает денег, покупаем для будущей прибыли
                                 if state['money'] >= price:
                                     return "buy_wagon", {"wagon_index": i}
-                                # Если не хватает, но можно взять кредит - берем!
-                                if state['credit'] == 0 and state['money'] + ge.CREDIT_GIVE >= price:
-                                    return "take_credit", {}
                                 break  # Проверили этот тип вагона, идем дальше
                     break  # Проверили этот контракт, идем дальше
 
@@ -296,8 +291,8 @@ if __name__ == "__main__":
         STRATEGIES = {
             "Взрослый (осторожный)": make_decision_adult,
             "Ребенок (импульсивный)": make_decision_kid,
-            "Эксплойтер (рисковый)": make_decision_exploiter,
-            "Ошибающийся игрок": make_decision_erratic,
+            # "Эксплойтер (рисковый)": make_decision_exploiter,
+            # "Ошибающийся игрок": make_decision_erratic,
         }
 
         all_results = []

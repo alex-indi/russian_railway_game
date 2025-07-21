@@ -1,12 +1,9 @@
 import random
-from copy import deepcopy
 
 # --- КОНСТАНТЫ И ДАННЫЕ ИГРЫ (без изменений) ---
-GOODS_PRICES = {"Уголь": 100, "Щебень": 80, "Желтый": 80, "Зеленый": 90, "Синий": 110, "Металл": 800}
-REPAIR_LOCO = 300
-REPAIR_WAGON = 200
-CREDIT_GIVE = 3000
-CREDIT_PAY = 4000
+GOODS_PRICES = {"Уголь": 120, "Щебень": 100, "Желтый": 100, "Зеленый": 110, "Синий": 140, "Металл": 800}
+REPAIR_LOCO = 500
+REPAIR_WAGON = 400
 WAGON_PRICES = {1: 3000, 2: 3000, 3: 3000, 4: 3000, 5: 5000}
 WAGON_INFO = {
     1: {"name": "Полувагон 1", "type": "gondola"}, 2: {"name": "Контейнер 1", "type": "container"},
@@ -16,26 +13,26 @@ WAGON_INFO = {
 GOOD_COMPATIBILITY = {"Уголь": "gondola", "Щебень": "gondola", "Желтый": "container", "Зеленый": "container",
                       "Синий": "container", "Металл": "platform"}
 CONTRACTS = [
-    {"id": "P1", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 5, "goods_2": None,
+    {"id": "P1", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 6, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
     {"id": "P2", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Щебень", "qty_1": 6, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
     {"id": "P3", "origin": "B", "destination": "A", "max_rounds": 3, "goods_1": "Желтый", "qty_1": 6, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
-    {"id": "P4", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Синий", "qty_1": 3, "goods_2": None,
+    {"id": "P4", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Синий", "qty_1": 2, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
     {"id": "P5", "origin": "B", "destination": "A", "max_rounds": 3, "goods_1": "Зеленый", "qty_1": 4, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
     {"id": "P6", "origin": "B", "destination": "A", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 4, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
-    {"id": "P7", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Щебень", "qty_1": 5, "goods_2": None,
+    {"id": "P7", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Щебень", "qty_1": 6, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
     {"id": "P8", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 2,
-     "goods_2": "Желтый", "qty_2": 3, "goods_3": None, "qty_3": 0},
+     "goods_2": "Желтый", "qty_2": 4, "goods_3": None, "qty_3": 0},
     {"id": "M1", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Уголь", "qty_1": 6,
      "goods_2": "Желтый", "qty_2": 6, "goods_3": None, "qty_3": 0},
     {"id": "M2", "origin": "B", "destination": "A", "max_rounds": 2, "goods_1": "Щебень", "qty_1": 9,
-     "goods_2": "Синий", "qty_2": 3, "goods_3": None, "qty_3": 0},
+     "goods_2": "Синий", "qty_2": 2, "goods_3": None, "qty_3": 0},
     {"id": "M3", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Зеленый", "qty_1": 10, "goods_2": None,
      "qty_2": 0, "goods_3": None, "qty_3": 0},
     {"id": "M4", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Уголь", "qty_1": 6,
@@ -128,14 +125,14 @@ def calculate_current_price(contract):
     base_price = contract_price(contract)
     rounds_left = contract.get('rounds_left', contract['max_rounds'])
     if contract['id'].startswith('P'):
-        if rounds_left <= 0: return 0
-        if rounds_left == 1: return int(base_price * 0.3)
-        if rounds_left == 2: return int(base_price * 0.6)
+        if rounds_left <= 0: return int(base_price * 0.4)
+        if rounds_left == 1: return int(base_price * 0.6)
+        if rounds_left == 2: return int(base_price * 0.8)
     elif contract['id'].startswith('M'):
-        if rounds_left <= 0: return 0
-        if rounds_left == 1: return int(base_price * 0.5)
+        if rounds_left <= 0: return int(base_price * 0.4)
+        if rounds_left == 1: return int(base_price * 0.6)
     elif contract['id'].startswith('S'):
-        if rounds_left <= 0: return 0
+        if rounds_left <= 0: return int(base_price * 0.5)
     return base_price
 
 
@@ -256,15 +253,32 @@ def _load_goods(state, contract_id):
             break
     return state
 
-
+def _deepcopy_state(state):
+    """
+    Безопасная и быстрая функция глубокого копирования, созданная специально для состояния нашей игры.
+    Она заменяет стандартную copy.deepcopy, чтобы избежать редкой ошибки.
+    """
+    new_state = {}
+    for key, value in state.items():
+        # Для списков: создаем новый список и делаем неглубокую копию каждого словаря внутри.
+        # Этого достаточно, так как у нас нет более глубокой вложенности.
+        if isinstance(value, list):
+            new_state[key] = [item.copy() for item in value]
+        # Для словарей: делаем неглубокую копию.
+        elif isinstance(value, dict):
+            new_state[key] = value.copy()
+        # Для простых типов (int, str, bool, None): просто присваиваем.
+        else:
+            new_state[key] = value
+    return new_state
 # --- ОСНОВНЫЕ ФУНКЦИИ ДВИЖКА ---
 
 def initialize_state():
     """Создает и возвращает словарь с начальным состоянием игры."""
     state = {
-        "round": 1, "time": 10, "money": 0, "credit": 0, "station": "A", "loco_hp": 3,
-        "contracts_pool": deepcopy(CONTRACTS), "active_contracts": [], "completed_contracts": [],
-        "moves_made_this_round": 0, "events_pool": deepcopy(EVENTS), "current_event": None,
+        "round": 1, "time": 10, "money": 2000, "station": "A", "loco_hp": 3,
+        "contracts_pool": [c.copy() for c in CONTRACTS], "active_contracts": [], "completed_contracts": [],
+        "moves_made_this_round": 0, "events_pool": [e.copy() for e in EVENTS], "current_event": None,
         "game_over": False, "game_over_reason": "",
         "modifiers": {
             "repair_cost_multiplier": 1.0, "move_time_cost": 2, "load_unload_time_cost": 1,
@@ -281,7 +295,7 @@ def initialize_state():
 def perform_action(state, action, **kwargs):
     """Главная функция, которая обрабатывает все действия и возвращает новое состояние."""
     if state['game_over']: return state
-    new_state = deepcopy(state)
+    new_state = _deepcopy_state(state)
 
     if action == "move":
         if new_state['moves_made_this_round'] < 2:
@@ -330,20 +344,15 @@ def perform_action(state, action, **kwargs):
 
     elif action == "take_contract":
         ctype = kwargs['ctype']
-        pool = [c for c in new_state['contracts_pool'] if c['id'].startswith(ctype)]
-        if pool and len(new_state['active_contracts']) < 4:
-            chosen_contract_orig = random.choice(pool)
-            chosen_contract = deepcopy(chosen_contract_orig)
+        contract_pool = [c for c in new_state['contracts_pool'] if c['id'].startswith(ctype)]
+        if contract_pool and len(new_state['active_contracts']) < 4:
+            chosen_contract_orig = random.choice(contract_pool)
+            chosen_contract = chosen_contract_orig.copy()
             chosen_contract['is_loaded'], chosen_contract['rounds_left'] = False, chosen_contract['max_rounds']
             new_state['active_contracts'].append(chosen_contract)
             # Удаляем оригинал из пула
             new_state['contracts_pool'] = [c for c in new_state['contracts_pool'] if
                                            c['id'] != chosen_contract_orig['id']]
-
-    elif action == "take_credit":
-        if new_state['credit'] == 0:
-            new_state['money'] += CREDIT_GIVE
-            new_state['credit'] += CREDIT_GIVE
 
     elif action == "end_round":
         if new_state['time'] <= 0 and new_state['station'] == "B":
@@ -356,7 +365,7 @@ def perform_action(state, action, **kwargs):
         new_state['modifiers'] = {"repair_cost_multiplier": 1.0, "move_time_cost": 2, "load_unload_time_cost": 1,
                                   "can_take_contracts": True, "revenue_multiplier": 1.0}
 
-        if not new_state['events_pool']: new_state['events_pool'] = deepcopy(EVENTS)
+        if not new_state['events_pool']: new_state['events_pool'] = [e.copy() for e in EVENTS]
         event_index = random.randrange(len(new_state['events_pool']))
         new_event = new_state['events_pool'].pop(event_index)
         new_state['current_event'] = new_event

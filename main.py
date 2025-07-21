@@ -5,11 +5,12 @@ import game_engine as ge  # Импортируем наш игровой дви�
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ UI ---
 # Эти функции генерируют HTML, поэтому они остаются в файле интерфейса.
 GOODS_HTML = {
-    "Уголь": '<span style="font-size:20px;">⬛</span>', "Щебень": '<span style="font-size:20px; color:#888;">⬜</span>',
+    "Уголь": '<span style="font-size:20px;">⬛</span>',
+    "Щебень": '<span style="font-size:20px; color:#FFD700;">⬜</span>',
     "Желтый": '<span style="font-size:20px; color:#FFD700;">🟨</span>',
     "Зеленый": '<span style="font-size:20px; color:#228B22;">🟩</span>',
     "Синий": '<span style="font-size:20px; color:#0066FF;">🟦</span>',
-    "Металл": '<span style="font-size:20px; color:#bbb;">⬜</span>',
+    "Металл": '<span style="font-size:20px; color:#333;">⬜</span>',
     None: '<span style="font-size:20px; color:#ccc;">▫️</span>',
 }
 PLATFORM_EMPTY = '<span style="font-size:20px; color:#aaa;">⚪</span>'
@@ -38,7 +39,7 @@ if 'game_state' not in st.session_state:
     st.session_state.game_state = ge.initialize_state()
 
 # --- ОСНОВНОЙ КОД ОТРИСОВКИ ИНТЕРФЕЙСА ---
-st.set_page_config(layout="wide")
+st.set_page_config()
 st.title("Железные дороги России")
 
 # Блок "Игра окончена"
@@ -58,7 +59,6 @@ cols = st.columns(4)
 cols[0].markdown(f"**Раунд:** {state['round']}")
 cols[1].markdown(f"**Время:** {state['time']}")
 cols[2].markdown(f"**Деньги:** {state['money']} ₽")
-cols[3].markdown(f"**Кредит:** {state['credit']} ₽")
 st.write(f"**Станция:** {state['station']}")
 
 # Отображение события раунда
@@ -153,13 +153,13 @@ if state['moves_made_this_round'] == 0:
         h_pool = [c for c in state['contracts_pool'] if c['id'].startswith('S')]
 
         if contract_cols[0].button(f"Простой ({len(s_pool)} шт.)", disabled=(not s_pool or not can_take)):
-            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='P');
+            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='P')
             st.rerun()
         if contract_cols[1].button(f"Средний ({len(m_pool)} шт.)", disabled=(not m_pool or not can_take)):
-            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='M');
+            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='M')
             st.rerun()
         if contract_cols[2].button(f"Сложный ({len(h_pool)} шт.)", disabled=(not h_pool or not can_take)):
-            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='S');
+            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='S')
             st.rerun()
     st.markdown("---")
 
@@ -194,7 +194,7 @@ else:
                 if st.button("Погрузка", key=f"load_{contract['id']}"):
                     if ge.check_capacity_for_contract(state, contract):
                         st.session_state.game_state = ge.perform_action(state, "load_contract",
-                                                                        contract_id=contract['id']);
+                                                                        contract_id=contract['id'])
                         st.rerun()
                     else:
                         st.error("Недостаточно места в вагонах!")
@@ -202,7 +202,7 @@ else:
             if contract.get('is_loaded') and state['station'] == contract['destination']:
                 if st.button("Разгрузка", key=f"unload_{contract['id']}"):
                     st.session_state.game_state = ge.perform_action(state, "unload_contract",
-                                                                    contract_id=contract['id']);
+                                                                    contract_id=contract['id'])
                     st.rerun()
         st.markdown("<hr style='margin:0.2rem 0'>", unsafe_allow_html=True)
 st.markdown("---")
@@ -213,10 +213,6 @@ main_action_cols = st.columns(3)
 
 if main_action_cols[0].button("Двигаться на другую станцию", disabled=(state['moves_made_this_round'] >= 2)):
     st.session_state.game_state = ge.perform_action(state, "move");
-    st.rerun()
-
-if main_action_cols[1].button("Взять кредит (3000₽, вернуть 4000₽)"):
-    st.session_state.game_state = ge.perform_action(state, "take_credit");
     st.rerun()
 
 if main_action_cols[2].button("Конец раунда (следующий)", disabled=(state['station'] != 'A'),
