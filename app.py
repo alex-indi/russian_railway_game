@@ -40,7 +40,7 @@ state = st.session_state.game_state
 # --- ВЕРХНЯЯ ИНФОРМАЦИОННАЯ ПАНЕЛЬ ---
 cols = st.columns([2, 2, 2, 3, 1])
 # Задаем стиль в одной переменной для удобства
-font_style = "font-size: 18px; font-weight: bold;" # Можете изменить 18px на 20px, 22px и т.д.
+font_style = "font-size: 26px; font-weight: bold;" # Можете изменить 18px на 20px, 22px и т.д.
 
 # Применяем стиль к каждому элементу
 cols[0].markdown(f'<div style="{font_style}">Раунд: {state["round"]}</div>', unsafe_allow_html=True)
