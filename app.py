@@ -1,7 +1,8 @@
 # app.py (Новая, 3-колоночная версия)
 import streamlit as st
-from config import *  # Импортируем все данные и параметры
+
 import game_engine as ge  # Импортируем наш игровой движок
+from config import *  # Импортируем все данные и параметры
 
 
 # --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ UI ---
@@ -38,16 +39,31 @@ if st.session_state.game_state['game_over']:
 state = st.session_state.game_state
 
 # --- ВЕРХНЯЯ ИНФОРМАЦИОННАЯ ПАНЕЛЬ ---
-cols = st.columns([2, 2, 2, 3, 1])
+cols = st.columns([2, 2, 2, 3, 1, 1])
 # Задаем стиль в одной переменной для удобства
-font_style = "font-size: 26px; font-weight: bold;" # Можете изменить 18px на 20px, 22px и т.д.
+font_style = "font-size: 26px; font-weight: bold;"  # Можете изменить 18px на 20px, 22px и т.д.
 
 # Применяем стиль к каждому элементу
 cols[0].markdown(f'<div style="{font_style}">Раунд: {state["round"]}</div>', unsafe_allow_html=True)
 cols[1].markdown(f'<div style="{font_style}">Время: {state["time"]}</div>', unsafe_allow_html=True)
 cols[2].markdown(f'<div style="{font_style}">Деньги: {state["money"]} ₽</div>', unsafe_allow_html=True)
 cols[3].markdown(f'<div style="{font_style}">Станция: {state["station"]}</div>', unsafe_allow_html=True)
-if cols[4].button("Новая игра", type="secondary"): st.session_state.confirm_restart = True
+if cols[4].button("Новая игра", type="secondary"):
+    st.session_state.confirm_restart = True
+if cols[5].button("Инструкция"):
+    st.session_state.show_instructions = True
+
+if st.session_state.get("show_instructions", False):
+    # Создаем модальное окно st.dialog
+    with st.dialog("Инструкция к игре"):
+        # Создаем "крестик" для закрытия
+        _, close_col = st.columns([0.9, 0.1]) # Колонки для выравнивания по правому краю
+        if close_col.button("✖️", key="close_instructions", help="Закрыть"):
+            st.session_state.show_instructions = False
+            st.rerun()
+
+        # Выводим текст инструкции
+        st.markdown(INSTRUCTIONS_TEXT)
 
 if st.session_state.get("confirm_restart", False):
     st.warning("**Вы уверены, что хотите начать новую игру?**")
