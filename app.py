@@ -39,10 +39,14 @@ state = st.session_state.game_state
 
 # --- ВЕРХНЯЯ ИНФОРМАЦИОННАЯ ПАНЕЛЬ ---
 cols = st.columns([2, 2, 2, 3, 1])
-cols[0].markdown(f"**Раунд:** {state['round']}")
-cols[1].markdown(f"**Время:** {state['time']}")
-cols[2].markdown(f"**Деньги:** {state['money']} ₽")
-cols[3].markdown(f"**Станция:** {state['station']}")
+# Задаем стиль в одной переменной для удобства
+font_style = "font-size: 18px; font-weight: bold;" # Можете изменить 18px на 20px, 22px и т.д.
+
+# Применяем стиль к каждому элементу
+cols[0].markdown(f'<div style="{font_style}">Раунд: {state["round"]}</div>', unsafe_allow_html=True)
+cols[1].markdown(f'<div style="{font_style}">Время: {state["time"]}</div>', unsafe_allow_html=True)
+cols[2].markdown(f'<div style="{font_style}">Деньги: {state["money"]} ₽</div>', unsafe_allow_html=True)
+cols[3].markdown(f'<div style="{font_style}">Станция: {state["station"]}</div>', unsafe_allow_html=True)
 if cols[4].button("Новая игра", type="secondary"): st.session_state.confirm_restart = True
 
 if st.session_state.get("confirm_restart", False):
@@ -70,7 +74,7 @@ with col1:
     st.markdown("#### Состав поезда")
     header_cols = st.columns([2, 1, 3, 2]);
     header_cols[0].markdown("**Состав**");
-    header_cols[1].markdown("**Здоровье**");
+    header_cols[1].markdown("**Тех. состояние**");
     header_cols[2].markdown("**Заполненность**");
     header_cols[3].markdown("**Действие**")
     loco_cols = st.columns([2, 1, 3, 2]);
