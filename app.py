@@ -76,7 +76,7 @@ with col1:
     loco_cols = st.columns([2, 1, 3, 2]);
     loco_cols[0].markdown("Локомотив");
     loco_cols[1].markdown(
-        f'<span style="color:red; font-size:20px;">{"♥" * state["loco_hp"]}</span><span style="color:lightgrey; font-size:20px;">{"♥" * (3 - state["loco_hp"])}</span>',
+        f'<span style="color:red; font-size:20px;">{"♥ " * state["loco_hp"]}</span><span style="color:lightgrey; font-size:20px;">{"♥ " * (3 - state["loco_hp"])}</span>',
         unsafe_allow_html=True)
     st.markdown("<hr style='margin:0.1rem 0'>", unsafe_allow_html=True)
     for i in range(1, 6):
@@ -88,7 +88,7 @@ with col1:
                 state[f"wagon_{i}_contents"], capacity)
             row_cols[0].markdown(WAGON_INFO[i]["name"])
             row_cols[1].markdown(
-                f'<span style="color:red; font-size:20px;">{"♥" * state[f"wagon_{i}_hp"]}</span><span style="color:lightgrey; font-size:20px;">{"♥" * (3 - state[f"wagon_{i}_hp"])}</span>',
+                f'<span style="color:red; font-size:20px;">{"♥ " * state[f"wagon_{i}_hp"]}</span><span style="color:lightgrey; font-size:20px;">{"♥ " * (3 - state[f"wagon_{i}_hp"])}</span>',
                 unsafe_allow_html=True)
             row_cols[2].markdown(fill_html, unsafe_allow_html=True)
         else:  # Если вагон не куплен
@@ -112,7 +112,7 @@ with col1:
     # Блок обслуживания (виден только в начале раунда на станции А)
     if state['moves_made_this_round'] == 0 and state['station'] == 'A':
         with st.container(border=True):
-            st.markdown("##### Предрейсовое обслуживание (Депо)")
+            st.markdown("##### Предрейсовое обслуживание")
             needs_repair = False
             if 0 < state['loco_hp'] < 3:
                 needs_repair = True
