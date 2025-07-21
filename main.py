@@ -1,295 +1,225 @@
-import random
-
 import streamlit as st
 
-from config import *
+import game_engine as ge  # Импортируем наш игровой движок
 
-# --- Вспомогательные функции ---
-GOODS_PRICES = {
-    "Уголь": G_COAL,
-    "Щебень": G_GRAVEL,
-    "Желтый": G_BOX_Y,
-    "Зеленый": G_BOX_G,
-    "Синий": G_BOX_B,
-    "Металл": G_METAL,
-}
-
-
-def contract_price(contract):
-    s = 0
-    for g, q in [
-        (contract["goods_1"], contract["qty_1"]),
-        (contract["goods_2"], contract["qty_2"]),
-        (contract["goods_3"], contract["qty_3"])
-    ]:
-        if g and q:
-            s += GOODS_PRICES[g] * q
-    return s
-
-
-def wagon_capacity(hp, cap3, cap2, cap1):
-    if hp == 3:
-        return cap3
-    elif hp == 2:
-        return cap2
-    elif hp == 1:
-        return cap1
-    else:
-        return 0
-
-
-# --- Инициализация состояния ---
-if "round" not in st.session_state:
-    st.session_state.round = 1
-    st.session_state.time = 10
-    st.session_state.money = 0
-    st.session_state.credit = 0
-    st.session_state.credit_due = 0
-    st.session_state.station = "A"
-    st.session_state.loco_hp = 3
-    st.session_state.wagon_1_is_purchased = True
-    st.session_state.wagon_1_hp = 3
-    st.session_state.wagon_2_is_purchased = True
-    st.session_state.wagon_2_hp = 3
-    st.session_state.wagon_3_is_purchased = False
-    st.session_state.wagon_3_hp = 0
-    st.session_state.wagon_4_is_purchased = False
-    st.session_state.wagon_4_hp = 0
-    st.session_state.wagon_5_is_purchased = False
-    st.session_state.wagon_5_hp = 0
-    st.session_state.active_contracts = []
-    st.session_state.completed_contracts = []
-    st.session_state.selected_contract = None
-    st.session_state.contracts_pool = list(CONTRACTS)
-
-for i in range(1, 6):
-    key = f"wagon_{i}_contents"
-    if key not in st.session_state:
-        st.session_state[key] = []
-if "platform_contents" not in st.session_state:
-    st.session_state.platform_contents = []
-
-# --- Отрисовка состояния поезда ---
-st.title("Железные дороги России")
-
-cols = st.columns(4)
-cols[0].markdown(f"**Раунд:** {st.session_state.round}")
-cols[1].markdown(f"**Время:** {st.session_state.time}")
-cols[2].markdown(f"**Деньги:** {st.session_state.money}")
-cols[3].markdown(f"**Кредит:** {st.session_state.credit}")
-
-st.write(f"**Станция:** {st.session_state.station}")
-
-# st.markdown(f"**Локомотив:** {'♥ ' * st.session_state.loco_hp}{'□' * (3 - st.session_state.loco_hp)}")
-# st.markdown(f"**Полувагон:** {'♥ ' * st.session_state.wagon_hp}{'□' * (3 - st.session_state.wagon_hp)}")
-# st.markdown(f"**Контейнер:** {'♥ ' * st.session_state.boxcar_hp}{'□' * (3 - st.session_state.boxcar_hp)}")
-# if st.session_state.have_platform:
-#     st.markdown(f"**Платформа:** {'♥' * st.session_state.platform_hp}{'□' * (3 - st.session_state.platform_hp)}")
-# else:
-#     st.markdown("*Платформа не куплена*")
-
-# Карта отображения грузов для HTML (можно заменить на SVG или эмодзи)
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДЛЯ UI ---
+# Эти функции генерируют HTML, поэтому они остаются в файле интерфейса.
 GOODS_HTML = {
-    "Уголь": '<span style="font-size:20px;">⬛</span>',
-    "Щебень": '<span style="font-size:20px; color:#888;">⬜</span>',
+    "Уголь": '<span style="font-size:20px;">⬛</span>', "Щебень": '<span style="font-size:20px; color:#888;">⬜</span>',
     "Желтый": '<span style="font-size:20px; color:#FFD700;">🟨</span>',
     "Зеленый": '<span style="font-size:20px; color:#228B22;">🟩</span>',
     "Синий": '<span style="font-size:20px; color:#0066FF;">🟦</span>',
     "Металл": '<span style="font-size:20px; color:#bbb;">⬜</span>',
     None: '<span style="font-size:20px; color:#ccc;">▫️</span>',
 }
-
 PLATFORM_EMPTY = '<span style="font-size:20px; color:#aaa;">⚪</span>'
 PLATFORM_FULL = '<span style="font-size:20px; color:#000;">⚫</span>'
 
 
-def get_wagon_fill_html(contents, hp):
+def get_wagon_fill_html(contents, capacity):
+    """Генерирует HTML для отображения заполненности вагона."""
     html = ''
-    for i in range(hp):
-        if i < len(contents):
-            html += GOODS_HTML.get(contents[i], GOODS_HTML[None])
-        else:
-            html += GOODS_HTML[None]
+    for i in range(capacity):
+        html += GOODS_HTML.get(contents[i]['good'] if i < len(contents) else None, GOODS_HTML[None])
     return html
 
 
-def get_platform_fill_html(contents, hp):
+def get_platform_fill_html(contents, capacity):
+    """Генерирует HTML для отображения заполненности платформы."""
     html = ''
-    for i in range(hp):
-        if i < len(contents):
-            html += PLATFORM_FULL
-        else:
-            html += PLATFORM_EMPTY
+    for i in range(capacity):
+        html += PLATFORM_FULL if i < len(contents) else PLATFORM_EMPTY
     return html
 
 
-rows = []
+# --- ИНИЦИАЛИЗАЦИЯ ИГРЫ ---
+# Если игрового состояния нет в сессии, создаем его с помощью движка.
+if 'game_state' not in st.session_state:
+    st.session_state.game_state = ge.initialize_state()
 
-# Локомотив
-rows.append(f"""
-<tr>
-    <td>Локомотив</td>
-    <td><span style="color:red; font-size:20px;">{"♥" * st.session_state.loco_hp}{"□ " * (3 - st.session_state.loco_hp)}</span></td>
-    <td></td>
-</tr>
-""")
+# --- ОСНОВНОЙ КОД ОТРИСОВКИ ИНТЕРФЕЙСА ---
+st.set_page_config(layout="wide")
+st.title("Железные дороги России")
 
-# Полувагон 1
-if st.session_state.wagon_1_is_purchased:
-    rows.append(f"""
-<tr>
-    <td>Полувагон 1</td>
-    <td><span style="color:red; font-size:20px;">{"♥" * st.session_state.wagon_1_hp}{"□" * (3 - st.session_state.wagon_1_hp)}</span></td>
-    <td>{get_wagon_fill_html(st.session_state.wagon_1_contents, st.session_state.wagon_1_hp)}</td>
-</tr>
-    """)
+# Блок "Игра окончена"
+if st.session_state.game_state['game_over']:
+    st.error(f"**ИГРА ОКОНЧЕНА!**\n\nПричина: {st.session_state.game_state['game_over_reason']}")
+    if st.button("Начать новую игру"):
+        # При старте новой игры мы просто заменяем старое состояние новым начальным.
+        st.session_state.game_state = ge.initialize_state()
+        st.rerun()
+    st.stop()  # Останавливаем отрисовку остальной части страницы
 
-# Контейнер 1
-if st.session_state.wagon_2_is_purchased:
-    rows.append(f"""
-<tr>
-    <td>Контейнер 1</td>
-    <td><span style="color:red; font-size:20px;">{"♥" * st.session_state.wagon_2_hp}{"□" * (3 - st.session_state.wagon_2_hp)}</span></td>
-    <td>{get_wagon_fill_html(st.session_state.wagon_2_contents, st.session_state.wagon_2_hp)}</td>
-</tr>
-    """)
+# Создаем короткую переменную для удобства доступа к состоянию
+state = st.session_state.game_state
 
-# Полувагон 2
-if st.session_state.wagon_3_is_purchased:
-    rows.append(f"""
-<tr>
-    <td>Полувагон 2</td>
-    <td><span style="color:red; font-size:20px;">{"♥" * st.session_state.wagon_3_hp}{"□" * (3 - st.session_state.wagon_3_hp)}</span></td>
-    <td>{get_wagon_fill_html(st.session_state.wagon_3_contents, st.session_state.wagon_3_hp)}</td>
-</tr>
-    """)
+# Отображение основной информации
+cols = st.columns(4)
+cols[0].markdown(f"**Раунд:** {state['round']}")
+cols[1].markdown(f"**Время:** {state['time']}")
+cols[2].markdown(f"**Деньги:** {state['money']} ₽")
+cols[3].markdown(f"**Кредит:** {state['credit']} ₽")
+st.write(f"**Станция:** {state['station']}")
 
-# Контейнер 2
-if st.session_state.wagon_4_is_purchased:
-    rows.append(f"""
-<tr>
-    <td>Контейнер 2</td>
-    <td><span style="color:red; font-size:20px;">{"♥" * st.session_state.wagon_4_hp}{"□" * (3 - st.session_state.wagon_4_hp)}</span></td>
-    <td>{get_wagon_fill_html(st.session_state.wagon_4_contents, st.session_state.wagon_4_hp)}</td>
-</tr>
-    """)
+# Отображение события раунда
+if state['current_event']:
+    event = state['current_event']
+    with st.container(border=True):
+        st.markdown(f"#### Событие раунда: **{event['name']}**")
+        st.caption(f"Описание: {event['description']}")
+st.markdown("---")
 
-# Платформа
-if st.session_state.wagon_5_is_purchased:
-    rows.append(f"""
-<tr>
-    <td>Платформа</td>
-    <td><span style="color:red; font-size:20px;">{"♥" * st.session_state.platform_hp}{"□" * (3 - st.session_state.platform_hp)}</span></td>
-    <td>{get_platform_fill_html(st.session_state.platform_contents, st.session_state.platform_hp)}</td>
-</tr>""")
+# Таблица "Состав поезда"
+header_cols = st.columns([2, 1, 3, 2]);
+header_cols[0].markdown("**Состав**");
+header_cols[1].markdown("**Здоровье**");
+header_cols[2].markdown("**Заполненность**");
+header_cols[3].markdown("**Действие**")
+loco_cols = st.columns([2, 1, 3, 2]);
+loco_cols[0].markdown("Локомотив");
+loco_cols[1].markdown(
+    f'<span style="color:red; font-size:20px;">{"♥" * state["loco_hp"]}</span><span style="color:lightgrey; font-size:20px;">{"♥" * (3 - state["loco_hp"])}</span>',
+    unsafe_allow_html=True)
+st.markdown("<hr style='margin:0.1rem 0'>", unsafe_allow_html=True)
 
-# Собираем финальный HTML
-table_html = f"""
-<table style="width:100%; border-collapse: collapse;">
-<tr>
-    <th style="text-align:left;">Состав</th>
-    <th style="text-align:left;">Здоровье</th>
-    <th style="text-align:left;">Заполненность</th>
-</tr>
-{''.join(rows)}
-</table>
-"""
-st.markdown(table_html, unsafe_allow_html=True)
+for i in range(1, 6):
+    row_cols = st.columns([2, 1, 3, 2])
+    if state[f"wagon_{i}_is_purchased"]:
+        capacity = ge.get_current_capacity(state, i)
+        fill_html = get_platform_fill_html(state[f"wagon_{i}_contents"], capacity) if ge.WAGON_INFO[i][
+                                                                                          'type'] == 'platform' else get_wagon_fill_html(
+            state[f"wagon_{i}_contents"], capacity)
+        row_cols[0].markdown(ge.WAGON_INFO[i]["name"])
+        row_cols[1].markdown(
+            f'<span style="color:red; font-size:20px;">{"♥" * state[f"wagon_{i}_hp"]}</span><span style="color:lightgrey; font-size:20px;">{"♥" * (3 - state[f"wagon_{i}_hp"])}</span>',
+            unsafe_allow_html=True)
+        row_cols[2].markdown(fill_html, unsafe_allow_html=True)
+    else:
+        row_cols[0].markdown(f"<span style='color:grey;'>{ge.WAGON_INFO[i]['name']}</span>", unsafe_allow_html=True)
+        row_cols[1].markdown("<span style='color:grey;'>-</span>", unsafe_allow_html=True)
+        row_cols[2].markdown("<span style='color:grey;'>Не куплен</span>", unsafe_allow_html=True)
+        price = ge.WAGON_PRICES[i]
+        if row_cols[3].button(f"Купить ({price}₽)", key=f"buy_wagon_{i}"):
+            if state['money'] >= price:
+                st.session_state.game_state = ge.perform_action(state, "buy_wagon", wagon_index=i)
+                st.rerun()
+            else:
+                st.error("Недостаточно денег для покупки!")
+    st.markdown("<hr style='margin:0.1rem 0'>", unsafe_allow_html=True)
+st.markdown("---")
 
-# --- Блок с выбором контракта ---
-st.subheader("Контракты (выбрать и взять до 4 одновременно)")
-available = [c for c in st.session_state.contracts_pool if
-             c not in st.session_state.active_contracts and c not in st.session_state.completed_contracts]
-contract_options = [
-    f"{c['id']}: {c['goods_1']}×{c['qty_1']}" + (f", {c['goods_2']}×{c['qty_2']}" if c['goods_2'] else "") + (
-        f", {c['goods_3']}×{c['qty_3']}" if c['goods_3'] else "") + f" ({contract_price(c)}₽)" for c in available]
-contract_idx = st.selectbox("Доступные контракты", range(len(available)), format_func=lambda i: contract_options[i],
-                            key="contract_choice")
+# Блок обслуживания в Депо (виден только в начале раунда на станции А)
+if state['moves_made_this_round'] == 0 and state['station'] == 'A':
+    with st.container(border=True):
+        st.subheader("Предрейсовое обслуживание (Депо)")
 
-if st.button("Взять контракт"):
-    if len(st.session_state.active_contracts) < 4:
-        st.session_state.active_contracts.append(available[contract_idx])
-        st.session_state.contracts_pool.remove(available[contract_idx])
+        # Ремонт локомотива
+        if 0 < state['loco_hp'] < 3:
+            cost = int(ge.REPAIR_LOCO * state['modifiers']['repair_cost_multiplier'])
+            cols = st.columns([3, 2]);
+            cols[0].markdown("**Локомотив** нуждается в ремонте.")
+            if cols[1].button(f"Ремонт ({cost}₽)", key="depot_repair_loco"):
+                if state['money'] >= cost:
+                    st.session_state.game_state = ge.perform_action(state, "repair_loco")
+                    st.rerun()
+                else:
+                    st.error("Недостаточно денег для ремонта!")
 
-# --- Отображение активных контрактов ---
+        # Ремонт вагонов
+        st.markdown("---")
+        for i in range(1, 6):
+            if state[f"wagon_{i}_is_purchased"] and 0 < state[f"wagon_{i}_hp"] < 3:
+                cost = int(ge.REPAIR_WAGON * state['modifiers']['repair_cost_multiplier'])
+                cols = st.columns([3, 2]);
+                cols[0].markdown(f"**{ge.WAGON_INFO[i]['name']}** нуждается в ремонте.")
+                if cols[1].button(f"Ремонт ({cost}₽)", key=f"depot_repair_wagon_{i}"):
+                    if state['money'] >= cost:
+                        st.session_state.game_state = ge.perform_action(state, "repair_wagon", wagon_index=i)
+                        st.rerun()
+                    else:
+                        st.error("Недостаточно денег!")
+    st.markdown("---")
+
+# Блок взятия контрактов (виден только в начале раунда)
+if state['moves_made_this_round'] == 0:
+    st.subheader("Взять новый контракт")
+    if len(state['active_contracts']) >= 4:
+        st.warning("Вы не можете взять больше 4 контрактов одновременно.")
+    else:
+        contract_cols = st.columns(3)
+        can_take = state['modifiers']['can_take_contracts']
+        s_pool = [c for c in state['contracts_pool'] if c['id'].startswith('P')]
+        m_pool = [c for c in state['contracts_pool'] if c['id'].startswith('M')]
+        h_pool = [c for c in state['contracts_pool'] if c['id'].startswith('S')]
+
+        if contract_cols[0].button(f"Простой ({len(s_pool)} шт.)", disabled=(not s_pool or not can_take)):
+            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='P');
+            st.rerun()
+        if contract_cols[1].button(f"Средний ({len(m_pool)} шт.)", disabled=(not m_pool or not can_take)):
+            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='M');
+            st.rerun()
+        if contract_cols[2].button(f"Сложный ({len(h_pool)} шт.)", disabled=(not h_pool or not can_take)):
+            st.session_state.game_state = ge.perform_action(state, "take_contract", ctype='S');
+            st.rerun()
+    st.markdown("---")
+
+# Таблица "Активные контракты"
 st.subheader("Активные контракты")
-if st.session_state.active_contracts:
-    for i, c in enumerate(st.session_state.active_contracts):
-        st.markdown(f"**{c['id']}** | {c['origin']}→{c['destination']} | "
-                    f"{c['goods_1']}×{c['qty_1']}"
-                    + (f", {c['goods_2']}×{c['qty_2']}" if c['goods_2'] else "")
-                    + (f", {c['goods_3']}×{c['qty_3']}" if c['goods_3'] else "")
-                    + f" | Осталось раундов: {c.get('rounds_left', c['max_rounds'])} | Сумма: {contract_price(c)}₽")
+if not state['active_contracts']:
+    st.info("У вас нет активных контрактов.")
+else:
+    act_header = st.columns([1, 2, 3, 1, 2]);
+    act_header[0].markdown("**ID**");
+    act_header[1].markdown("**Маршрут**");
+    act_header[2].markdown("**Товары**");
+    act_header[3].markdown("**Срок**");
+    act_header[4].markdown("**Действие**")
+    for contract in state['active_contracts']:
+        act_cols = st.columns([1, 2, 3, 1, 2])
+        goods_str = f"{contract['goods_1']}×{contract['qty_1']}"
+        if contract['goods_2']: goods_str += f", {contract['goods_2']}×{contract['qty_2']}"
+        if contract['goods_3']: goods_str += f", {contract['goods_3']}×{contract['qty_3']}"
+        status_color = "lightgreen" if contract.get('is_loaded') else "orange"
 
-        if st.button(f"Выполнить контракт {c['id']}", key=f"done_{i}"):
-            st.session_state.completed_contracts.append(c)
-            st.session_state.active_contracts.remove(c)
-            st.session_state.money += contract_price(c)
+        act_cols[0].markdown(f"**{contract['id']}**")
+        act_cols[1].markdown(
+            f"{contract['origin']} → {contract['destination']} <span style='color:{status_color};'>●</span>",
+            unsafe_allow_html=True)
+        act_cols[2].markdown(f"{goods_str} ({ge.calculate_current_price(contract)}₽)")
+        act_cols[3].markdown(f"{contract['rounds_left']}")
 
-# --- Действия по поезду и игре ---
+        with act_cols[4]:
+            loading_forbidden = (state['station'] == 'A' and state['moves_made_this_round'] >= 2)
+            if not contract.get('is_loaded') and state['station'] == contract['origin'] and not loading_forbidden:
+                if st.button("Погрузка", key=f"load_{contract['id']}"):
+                    if ge.check_capacity_for_contract(state, contract):
+                        st.session_state.game_state = ge.perform_action(state, "load_contract",
+                                                                        contract_id=contract['id']);
+                        st.rerun()
+                    else:
+                        st.error("Недостаточно места в вагонах!")
+
+            if contract.get('is_loaded') and state['station'] == contract['destination']:
+                if st.button("Разгрузка", key=f"unload_{contract['id']}"):
+                    st.session_state.game_state = ge.perform_action(state, "unload_contract",
+                                                                    contract_id=contract['id']);
+                    st.rerun()
+        st.markdown("<hr style='margin:0.2rem 0'>", unsafe_allow_html=True)
+st.markdown("---")
+
+# Основные действия по игре
 st.subheader("Действия")
+main_action_cols = st.columns(3)
 
-cols = st.columns(3)
-if cols[0].button("Двигаться на другую станцию"):
-    st.session_state.station = "A" if st.session_state.station == "B" else "B"
-    st.session_state.time = max(0, st.session_state.time - 2)  # 2 ед. времени
+if main_action_cols[0].button("Двигаться на другую станцию", disabled=(state['moves_made_this_round'] >= 2)):
+    st.session_state.game_state = ge.perform_action(state, "move");
+    st.rerun()
 
-if cols[1].button("Погрузка/разгрузка"):
-    st.session_state.time = max(0, st.session_state.time - 1)  # 1 ед. времени
+if main_action_cols[1].button("Взять кредит (3000₽, вернуть 4000₽)"):
+    st.session_state.game_state = ge.perform_action(state, "take_credit");
+    st.rerun()
 
-if cols[2].button("Чинить локомотив"):
-    if st.session_state.money >= REPAIR_LOCO and st.session_state.loco_hp < 3:
-        st.session_state.money -= REPAIR_LOCO
-        st.session_state.loco_hp = 3
-
-st.subheader("Управление вагонами")
-wcol = st.columns(3)
-if wcol[0].button("Чинить полувагон"):
-    if st.session_state.money >= REPAIR_WAGON and st.session_state.wagon_hp < 3:
-        st.session_state.money -= REPAIR_WAGON
-        st.session_state.wagon_hp = 3
-if wcol[1].button("Чинить контейнер"):
-    if st.session_state.money >= REPAIR_WAGON and st.session_state.boxcar_hp < 3:
-        st.session_state.money -= REPAIR_WAGON
-        st.session_state.boxcar_hp = 3
-if wcol[2].button("Купить платформу (5000₽)"):
-    if not st.session_state.have_platform and st.session_state.money >= 5000:
-        st.session_state.money -= 5000
-        st.session_state.have_platform = True
-        st.session_state.platform_hp = 3
-
-# --- Взять кредит ---
-if st.button("Взять кредит (3000₽, вернуть 4000₽)"):
-    if st.session_state.credit == 0:
-        st.session_state.money += CREDIT_GIVE
-        st.session_state.credit = CREDIT_GIVE
-        st.session_state.credit_due = CREDIT_PAY
-
-# --- Конец раунда ---
-if st.button("Конец раунда (следующий)"):
-    st.session_state.round += 1
-    st.session_state.time = 10
-    # Списание сроков
-    for c in st.session_state.active_contracts:
-        c['rounds_left'] = c.get('rounds_left', c['max_rounds']) - 1
-        # Обесценивание после срока
-        if c['rounds_left'] < 0:
-            c['depreciation'] = c.get('depreciation', 1) * 0.5
-
-    # Случайная поломка (например 1/6 шанс) для локомотива
-    if random.randint(1, 6) == 1:
-        st.session_state.loco_hp = max(0, st.session_state.loco_hp - 1)
-
-    # Обновить цену контрактов с учетом обесценивания
-    for c in st.session_state.active_contracts:
-        if 'depreciation' in c:
-            old_price = contract_price(c)
-            new_price = int(old_price * c['depreciation'])
-            c['price'] = new_price
-
-st.write("**Выполненные контракты:**")
-for c in st.session_state.completed_contracts:
-    st.write(f"{c['id']} ({contract_price(c)}₽)")
-
-st.info(
-    "*Базовая демо-версия. Для усложнения — добавьте события, хранение состояния вагонов, ограничения вместимости по HP, автоматизацию штрафов и проверок.*")
+if main_action_cols[2].button("Конец раунда (следующий)", disabled=(state['station'] != 'A'),
+                              help="Завершить раунд можно только на станции А."):
+    st.session_state.game_state = ge.perform_action(state, "end_round");
+    st.rerun()

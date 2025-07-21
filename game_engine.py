@@ -1,0 +1,380 @@
+import random
+from copy import deepcopy
+
+# --- КОНСТАНТЫ И ДАННЫЕ ИГРЫ (без изменений) ---
+GOODS_PRICES = {"Уголь": 100, "Щебень": 80, "Желтый": 80, "Зеленый": 90, "Синий": 110, "Металл": 800}
+REPAIR_LOCO = 300
+REPAIR_WAGON = 200
+CREDIT_GIVE = 3000
+CREDIT_PAY = 4000
+WAGON_PRICES = {1: 3000, 2: 3000, 3: 3000, 4: 3000, 5: 5000}
+WAGON_INFO = {
+    1: {"name": "Полувагон 1", "type": "gondola"}, 2: {"name": "Контейнер 1", "type": "container"},
+    3: {"name": "Полувагон 2", "type": "gondola"}, 4: {"name": "Контейнер 2", "type": "container"},
+    5: {"name": "Платформа", "type": "platform"},
+}
+GOOD_COMPATIBILITY = {"Уголь": "gondola", "Щебень": "gondola", "Желтый": "container", "Зеленый": "container",
+                      "Синий": "container", "Металл": "platform"}
+CONTRACTS = [
+    {"id": "P1", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 5, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P2", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Щебень", "qty_1": 6, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P3", "origin": "B", "destination": "A", "max_rounds": 3, "goods_1": "Желтый", "qty_1": 6, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P4", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Синий", "qty_1": 3, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P5", "origin": "B", "destination": "A", "max_rounds": 3, "goods_1": "Зеленый", "qty_1": 4, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P6", "origin": "B", "destination": "A", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 4, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P7", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Щебень", "qty_1": 5, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "P8", "origin": "A", "destination": "B", "max_rounds": 3, "goods_1": "Уголь", "qty_1": 2,
+     "goods_2": "Желтый", "qty_2": 3, "goods_3": None, "qty_3": 0},
+    {"id": "M1", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Уголь", "qty_1": 6,
+     "goods_2": "Желтый", "qty_2": 6, "goods_3": None, "qty_3": 0},
+    {"id": "M2", "origin": "B", "destination": "A", "max_rounds": 2, "goods_1": "Щебень", "qty_1": 9,
+     "goods_2": "Синий", "qty_2": 3, "goods_3": None, "qty_3": 0},
+    {"id": "M3", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Зеленый", "qty_1": 10, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "M4", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Уголь", "qty_1": 6,
+     "goods_2": "Щебень", "qty_2": 4, "goods_3": None, "qty_3": 0},
+    {"id": "M5", "origin": "B", "destination": "A", "max_rounds": 2, "goods_1": "Синий", "qty_1": 6, "goods_2": None,
+     "qty_2": 0, "goods_3": None, "qty_3": 0},
+    {"id": "M6", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Уголь", "qty_1": 10,
+     "goods_2": "Зеленый", "qty_2": 4, "goods_3": None, "qty_3": 0},
+    {"id": "M7", "origin": "B", "destination": "A", "max_rounds": 2, "goods_1": "Щебень", "qty_1": 12,
+     "goods_2": "Желтый", "qty_2": 6, "goods_3": None, "qty_3": 0},
+    {"id": "M8", "origin": "A", "destination": "B", "max_rounds": 2, "goods_1": "Щебень", "qty_1": 6,
+     "goods_2": "Желтый", "qty_2": 6, "goods_3": None, "qty_3": 0},
+    {"id": "S1", "origin": "A", "destination": "B", "max_rounds": 1, "goods_1": "Металл", "qty_1": 1,
+     "goods_2": "Уголь", "qty_2": 6, "goods_3": None, "qty_3": 0},
+    {"id": "S2", "origin": "B", "destination": "A", "max_rounds": 1, "goods_1": "Металл", "qty_1": 2,
+     "goods_2": "Щебень", "qty_2": 6, "goods_3": None, "qty_3": 0},
+    {"id": "S3", "origin": "A", "destination": "B", "max_rounds": 1, "goods_1": "Зеленый", "qty_1": 6,
+     "goods_2": "Синий", "qty_2": 6, "goods_3": None, "qty_3": 0},
+    {"id": "S4", "origin": "A", "destination": "B", "max_rounds": 1, "goods_1": "Металл", "qty_1": 2,
+     "goods_2": "Зеленый", "qty_2": 4, "goods_3": "Щебень", "qty_3": 4},
+]
+EVENTS = [
+    {"id": "E01", "group": "Нештатные", "name": "Поломка локомотива",
+     "description": "−1 к техническому состоянию локомотива."},
+    {"id": "E02", "group": "Нештатные", "name": "Текущий ремонт",
+     "description": "+1 к техническому состоянию всему составу (включая локомотив)."},
+    {"id": "E03", "group": "Нештатные", "name": "Поломка пути",
+     "description": "−1 единица времени и 500 рублей на непредвиденный ремонт."},
+    {"id": "E04", "group": "Нештатные", "name": "День железнодорожника",
+     "description": "Коллеги поздравляют друг друга. Никаких эффектов."},
+    {"id": "E05", "group": "Нештатные", "name": "Обвал тоннеля", "description": "−1000 рублей на расчистку путей."},
+    {"id": "E06", "group": "Нештатные", "name": "Потеря груза",
+     "description": "Вся прибыль от разгрузки в этом раунде снижена на 50%."},
+    {"id": "E07", "group": "Нештатные", "name": "Капитальный ремонт",
+     "description": "Техническое состояние всего поезда полностью восстановлено!"},
+    {"id": "E08", "group": "Нештатные", "name": "Инновация",
+     "description": "Стоимость ремонта локомотивов и вагонов снижена на 50% в этом раунде."},
+    {"id": "E09", "group": "Нештатные", "name": "Поломка пути",
+     "description": "−1 единица времени и 500 рублей на непредвиденный ремонт."},
+    {"id": "E10", "group": "Нештатные", "name": "Текущий ремонт",
+     "description": "+1 к техническому состоянию всему составу (включая локомотив)."},
+    {"id": "E11", "group": "Нештатные", "name": "Поломка локомотива",
+     "description": "−1 к техническому состоянию локомотива."},
+    {"id": "E12", "group": "Нештатные", "name": "Дерево на пути", "description": "−800 рублей на расчистку."},
+    {"id": "P01", "group": "Погодные", "name": "Дождь", "description": "−2 единицы времени из-за плохой видимости."},
+    {"id": "P02", "group": "Погодные", "name": "Снегопад",
+     "description": "−1 единица времени. Возможны дополнительные поломки."},
+    {"id": "P03", "group": "Погодные", "name": "Туман", "description": "−1 единица времени."},
+    {"id": "P04", "group": "Погодные", "name": "Ясная погода",
+     "description": "Отличные условия для работы. Никаких эффектов."},
+    {"id": "P05", "group": "Погодные", "name": "Ясная погода",
+     "description": "Отличные условия для работы. Никаких эффектов."},
+    {"id": "P06", "group": "Погодные", "name": "Гололёд",
+     "description": "Погрузка и разгрузка теперь занимает 2 единицы времени вместо одной."},
+    {"id": "P07", "group": "Погодные", "name": "Дождь", "description": "−2 единицы времени из-за плохой видимости."},
+    {"id": "P08", "group": "Погодные", "name": "Туман", "description": "−1 единица времени."},
+    {"id": "P09", "group": "Погодные", "name": "Снегопад",
+     "description": "−1 единица времени. Возможны дополнительные поломки."},
+    {"id": "P10", "group": "Погодные", "name": "Дождь", "description": "−2 единицы времени из-за плохой видимости."},
+    {"id": "H01", "group": "Человеческий фактор", "name": "Болезнь машиниста",
+     "description": "Движение между станциями теперь занимает 4 единицы времени."},
+    {"id": "H02", "group": "Человеческий фактор", "name": "Болезнь составителя",
+     "description": "Погрузка и разгрузка теперь занимает 2 единицы времени."},
+    {"id": "H03", "group": "Человеческий фактор", "name": "Болезнь логиста",
+     "description": "Вы не можете брать новые контракты в этом раунде."},
+    {"id": "H04", "group": "Человеческий фактор", "name": "Болезнь логиста",
+     "description": "Вы не можете брать новые контракты в этом раунде."},
+    {"id": "H05", "group": "Человеческий фактор", "name": "Премия",
+     "description": "Вы получаете премию в размере 1000 рублей."},
+    {"id": "H06", "group": "Человеческий фактор", "name": "Машинист 1-ого класса",
+     "description": "Движение между станциями в этом раунде не требует времени!"},
+    {"id": "H07", "group": "Человеческий фактор", "name": "День рождения машиниста",
+     "description": "Все поздравляют именинника. Никаких эффектов."},
+    {"id": "H08", "group": "Человеческий фактор", "name": "Увольнение машиниста",
+     "description": "−500 рублей на найм и обучение нового сотрудника."},
+]
+
+
+# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ДВИЖКА ---
+
+def contract_price(contract):
+    s = 0
+    for g, q in [(contract["goods_1"], contract["qty_1"]), (contract["goods_2"], contract["qty_2"]),
+                 (contract["goods_3"], contract["qty_3"])]:
+        if g and q: s += GOODS_PRICES.get(g, 0) * q
+    return s
+
+
+def calculate_current_price(contract):
+    base_price = contract_price(contract)
+    rounds_left = contract.get('rounds_left', contract['max_rounds'])
+    if contract['id'].startswith('P'):
+        if rounds_left <= 0: return 0
+        if rounds_left == 1: return int(base_price * 0.3)
+        if rounds_left == 2: return int(base_price * 0.6)
+    elif contract['id'].startswith('M'):
+        if rounds_left <= 0: return 0
+        if rounds_left == 1: return int(base_price * 0.5)
+    elif contract['id'].startswith('S'):
+        if rounds_left <= 0: return 0
+    return base_price
+
+
+def get_current_capacity(state, wagon_index):
+    hp = state[f"wagon_{wagon_index}_hp"]
+    wagon_type = WAGON_INFO[wagon_index]["type"]
+    if hp <= 0: return 0
+    if wagon_type == "platform":
+        return hp
+    else:
+        if hp == 3: return 6
+        if hp == 2: return 4
+        if hp == 1: return 2
+    return 0
+
+
+def check_capacity_for_contract(state, contract):
+    goods_to_load = []
+    for g, q in [(contract["goods_1"], contract["qty_1"]), (contract["goods_2"], contract["qty_2"]),
+                 (contract["goods_3"], contract["qty_3"])]:
+        if g and q: goods_to_load.extend([g] * q)
+
+    available_space = {i: get_current_capacity(state, i) - len(state[f"wagon_{i}_contents"]) for i in range(1, 6) if
+                       state[f"wagon_{i}_is_purchased"]}
+    gondola_type = {i: state[f"wagon_{i}_contents"][0]['good'] for i in available_space if
+                    WAGON_INFO[i]["type"] == "gondola" and state[f"wagon_{i}_contents"]}
+
+    for good in goods_to_load:
+        found_slot = False
+        compatible_wagon_type = GOOD_COMPATIBILITY[good]
+        for i in sorted(available_space.keys()):
+            if WAGON_INFO[i]["type"] == compatible_wagon_type and available_space[i] > 0:
+                if compatible_wagon_type == "gondola":
+                    if i in gondola_type and gondola_type[i] != good: continue
+                    if i not in gondola_type: gondola_type[i] = good
+                available_space[i] -= 1
+                found_slot = True
+                break
+        if not found_slot: return False
+    return True
+
+
+def apply_event_effect(state, event):
+    event_id = event['id']
+    if event_id in ["E01", "E11"]:
+        if state['loco_hp'] > 0:
+            state['loco_hp'] -= 1
+            if state['loco_hp'] <= 0: state['game_over'], state['game_over_reason'] = True, "Локомотив сломан!"
+    elif event_id in ["E02", "E10"]:
+        state['loco_hp'] = min(3, state['loco_hp'] + 1)
+        for i in range(1, 6):
+            if state[f"wagon_{i}_is_purchased"]: state[f"wagon_{i}_hp"] = min(3, state[f"wagon_{i}_hp"] + 1)
+    elif event_id in ["E03", "E09"]:
+        state['time'], state['money'] = max(0, state['time'] - 1), state['money'] - 500
+    elif event_id == "E05":
+        state['money'] -= 1000
+    elif event_id == "E06":
+        state['modifiers']["revenue_multiplier"] = 0.5
+    elif event_id == "E07":
+        state['loco_hp'] = 3
+        for i in range(1, 6):
+            if state[f"wagon_{i}_is_purchased"]: state[f"wagon_{i}_hp"] = 3
+    elif event_id == "E08":
+        state['modifiers']["repair_cost_multiplier"] = 0.5
+    elif event_id == "E12":
+        state['money'] -= 800
+    elif event_id in ["P01", "P07", "P10"]:
+        state['time'] = max(0, state['time'] - 2)
+    elif event_id in ["P02", "P09"]:
+        state['time'] = max(0, state['time'] - 1)
+        if random.randint(1, 6) == 1 and state['loco_hp'] > 0:
+            state['loco_hp'] -= 1
+            if state['loco_hp'] <= 0: state['game_over'], state[
+                'game_over_reason'] = True, "Локомотив сломан в снегопад!"
+        for i in range(1, 6):
+            if state[f"wagon_{i}_is_purchased"] and state[f"wagon_{i}_hp"] > 0 and random.randint(1, 6) == 1:
+                state[f"wagon_{i}_hp"] -= 1
+                if state[f"wagon_{i}_hp"] <= 0:
+                    state[f"wagon_{i}_is_purchased"], state[f"wagon_{i}_contents"] = False, []
+    elif event_id in ["P03", "P08"]:
+        state['time'] = max(0, state['time'] - 1)
+    elif event_id == "P06":
+        state['modifiers']["load_unload_time_cost"] = 2
+    elif event_id == "H01":
+        state['modifiers']["move_time_cost"] = 4
+    elif event_id == "H02":
+        state['modifiers']["load_unload_time_cost"] = 2
+    elif event_id in ["H03", "H04"]:
+        state['modifiers']["can_take_contracts"] = False
+    elif event_id == "H05":
+        state['money'] += 1000
+    elif event_id == "H06":
+        state['modifiers']["move_time_cost"] = 0
+    elif event_id == "H08":
+        state['money'] -= 500
+    if state['money'] < 0: state['game_over'], state[
+        'game_over_reason'] = True, f"Банкротство из-за события «{event['name']}»!"
+
+
+def _load_goods(state, contract_id):
+    """Приватная функция для фактической загрузки товаров в вагоны. Вызывается из perform_action."""
+    for c in state['active_contracts']:
+        if c['id'] == contract_id:
+            goods_to_load = []
+            for g, q in [(c["goods_1"], c["qty_1"]), (c["goods_2"], c["qty_2"]), (c["goods_3"], c["qty_3"])]:
+                if g and q: goods_to_load.extend([{"good": g, "contract_id": c['id']}] * q)
+
+            for item in goods_to_load:
+                ctype = GOOD_COMPATIBILITY[item['good']]
+                for i in range(1, 6):
+                    if state[f"wagon_{i}_is_purchased"] and WAGON_INFO[i]['type'] == ctype and len(
+                            state[f"wagon_{i}_contents"]) < get_current_capacity(state, i):
+                        if ctype == "gondola" and state[f"wagon_{i}_contents"] and state[f"wagon_{i}_contents"][0][
+                            'good'] != item['good']: continue
+                        state[f"wagon_{i}_contents"].append(item)
+                        break
+            c['is_loaded'] = True
+            break
+    return state
+
+
+# --- ОСНОВНЫЕ ФУНКЦИИ ДВИЖКА ---
+
+def initialize_state():
+    """Создает и возвращает словарь с начальным состоянием игры."""
+    state = {
+        "round": 1, "time": 10, "money": 0, "credit": 0, "station": "A", "loco_hp": 3,
+        "contracts_pool": deepcopy(CONTRACTS), "active_contracts": [], "completed_contracts": [],
+        "moves_made_this_round": 0, "events_pool": deepcopy(EVENTS), "current_event": None,
+        "game_over": False, "game_over_reason": "",
+        "modifiers": {
+            "repair_cost_multiplier": 1.0, "move_time_cost": 2, "load_unload_time_cost": 1,
+            "can_take_contracts": True, "revenue_multiplier": 1.0,
+        }
+    }
+    for i in range(1, 6):
+        state[f"wagon_{i}_is_purchased"] = i <= 2
+        state[f"wagon_{i}_hp"] = 3 if i <= 2 else 0
+        state[f"wagon_{i}_contents"] = []
+    return state
+
+
+def perform_action(state, action, **kwargs):
+    """Главная функция, которая обрабатывает все действия и возвращает новое состояние."""
+    if state['game_over']: return state
+    new_state = deepcopy(state)
+
+    if action == "move":
+        if new_state['moves_made_this_round'] < 2:
+            new_state['station'] = "A" if new_state['station'] == "B" else "B"
+            new_state['time'] -= new_state['modifiers']['move_time_cost']
+            new_state['moves_made_this_round'] += 1
+
+    elif action == "load_contract":
+        contract_id = kwargs['contract_id']
+        new_state = _load_goods(new_state, contract_id)
+        new_state['time'] -= new_state['modifiers']['load_unload_time_cost']
+
+    elif action == "unload_contract":
+        contract_id = kwargs['contract_id']
+        price = 0
+        contract_to_remove = next((c for c in new_state['active_contracts'] if c['id'] == contract_id), None)
+        if contract_to_remove:
+            for i in range(1, 6):
+                if new_state[f"wagon_{i}_is_purchased"]:
+                    new_state[f"wagon_{i}_contents"] = [item for item in new_state[f"wagon_{i}_contents"] if
+                                                        item['contract_id'] != contract_id]
+            price = calculate_current_price(contract_to_remove)
+            new_state['completed_contracts'].append(contract_to_remove)
+            new_state['active_contracts'].remove(contract_to_remove)
+        revenue = int(price * new_state['modifiers']["revenue_multiplier"])
+        new_state['money'] += revenue
+        new_state['time'] -= new_state['modifiers']['load_unload_time_cost']
+
+    elif action == "buy_wagon":
+        wagon_index = kwargs['wagon_index']
+        price = WAGON_PRICES[wagon_index]
+        new_state['money'] -= price
+        new_state[f"wagon_{wagon_index}_is_purchased"] = True
+        new_state[f"wagon_{wagon_index}_hp"] = 3
+
+    elif action == "repair_loco":
+        cost = int(REPAIR_LOCO * new_state['modifiers']['repair_cost_multiplier'])
+        new_state['money'] -= cost
+        new_state['loco_hp'] = 3
+
+    elif action == "repair_wagon":
+        wagon_index = kwargs['wagon_index']
+        cost = int(REPAIR_WAGON * new_state['modifiers']['repair_cost_multiplier'])
+        new_state['money'] -= cost
+        new_state[f"wagon_{wagon_index}_hp"] = 3
+
+    elif action == "take_contract":
+        ctype = kwargs['ctype']
+        pool = [c for c in new_state['contracts_pool'] if c['id'].startswith(ctype)]
+        if pool and len(new_state['active_contracts']) < 4:
+            chosen_contract_orig = random.choice(pool)
+            chosen_contract = deepcopy(chosen_contract_orig)
+            chosen_contract['is_loaded'], chosen_contract['rounds_left'] = False, chosen_contract['max_rounds']
+            new_state['active_contracts'].append(chosen_contract)
+            # Удаляем оригинал из пула
+            new_state['contracts_pool'] = [c for c in new_state['contracts_pool'] if
+                                           c['id'] != chosen_contract_orig['id']]
+
+    elif action == "take_credit":
+        if new_state['credit'] == 0:
+            new_state['money'] += CREDIT_GIVE
+            new_state['credit'] += CREDIT_GIVE
+
+    elif action == "end_round":
+        if new_state['time'] <= 0 and new_state['station'] == "B":
+            new_state['game_over'], new_state['game_over_reason'] = True, "Время истекло на станции Б."
+            return new_state
+
+        new_state['round'] += 1
+        new_state['time'] = 10
+        new_state['moves_made_this_round'] = 0
+        new_state['modifiers'] = {"repair_cost_multiplier": 1.0, "move_time_cost": 2, "load_unload_time_cost": 1,
+                                  "can_take_contracts": True, "revenue_multiplier": 1.0}
+
+        if not new_state['events_pool']: new_state['events_pool'] = deepcopy(EVENTS)
+        event_index = random.randrange(len(new_state['events_pool']))
+        new_event = new_state['events_pool'].pop(event_index)
+        new_state['current_event'] = new_event
+        apply_event_effect(new_state, new_event)
+        if new_state['game_over']: return new_state
+
+        for c in new_state['active_contracts']: c['rounds_left'] -= 1
+
+        if random.randint(1, 6) == 1 and new_state['loco_hp'] > 0:
+            new_state['loco_hp'] -= 1
+            if new_state['loco_hp'] <= 0:
+                new_state['game_over'], new_state['game_over_reason'] = True, "Износ локомотива."
+                return new_state  # Немедленно выходим
+
+        for i in range(1, 6):
+            if new_state[f"wagon_{i}_is_purchased"] and new_state[f"wagon_{i}_hp"] > 0 and random.randint(1, 6) == 1:
+                new_state[f"wagon_{i}_hp"] -= 1
+                if new_state[f"wagon_{i}_hp"] <= 0:
+                    new_state[f"wagon_{i}_is_purchased"], new_state[f"wagon_{i}_contents"] = False, []
+
+    return new_state
