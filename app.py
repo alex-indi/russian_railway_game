@@ -55,15 +55,21 @@ if cols[5].button("Инструкция"):
 
 if st.session_state.get("show_instructions", False):
     # Создаем модальное окно st.dialog
-    with st.dialog("Инструкция к игре"):
+    with st.container(border=True):
         # Создаем "крестик" для закрытия
-        _, close_col = st.columns([0.9, 0.1]) # Колонки для выравнивания по правому краю
+        _, close_col = st.columns([0.9, 0.1])  # Колонки для выравнивания по правому краю
         if close_col.button("✖️", key="close_instructions", help="Закрыть"):
             st.session_state.show_instructions = False
             st.rerun()
 
-        # Выводим текст инструкции
+        # Выводим заголовок и текст инструкции
+        st.header("Инструкция к игре")
         st.markdown(INSTRUCTIONS_TEXT)
+
+        # Еще одна кнопка "Закрыть" внизу для удобства
+        if st.button("Закрыть инструкцию"):
+            st.session_state.show_instructions = False
+            st.rerun()
 
 if st.session_state.get("confirm_restart", False):
     st.warning("**Вы уверены, что хотите начать новую игру?**")
