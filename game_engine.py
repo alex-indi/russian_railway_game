@@ -1,5 +1,6 @@
 # game_engine.py
 import random
+
 from config import *  # Импортируем все константы и данные из config.py
 
 
@@ -163,10 +164,19 @@ def _load_goods(state, contract_id):
 def initialize_state():
     """Создает и возвращает словарь с начальным состоянием игры."""
     state = {
-        "round": 1, "time": 10, "money": STARTING_MONEY, "station": "A", "loco_hp": 3,
-        "contracts_pool": [c.copy() for c in CONTRACTS], "active_contracts": [], "completed_contracts": [],
-        "moves_made_this_round": 0, "events_pool": [e.copy() for e in EVENTS], "current_event": None,
-        "game_over": False, "game_over_reason": "",
+        "round": 1,
+        "time": 10,
+        "money": STARTING_MONEY,
+        "station": "A",
+        "loco_hp": 3,
+        "contracts_pool": [c.copy() for c in CONTRACTS], "active_contracts": [],
+        "completed_contracts": [],
+        "moves_made_this_round": 0,
+        "events_pool": [e.copy() for e in EVENTS],
+        "current_event": None,
+        "game_over": False,
+        "game_over_reason": "",
+        "repaired_this_round": False,
         "modifiers": {
             "repair_cost_multiplier": 1.0, "move_time_cost": 2, "load_unload_time_cost": 1,
             "can_take_contracts": True, "revenue_multiplier": 1.0,
@@ -180,35 +190,53 @@ def initialize_state():
 
 
 def perform_action(state, action, **kwargs):
-    """Главная функция, которая обрабатывает все действия и возвращает новое состояние."""
-    if state['game_over']: return state
+    """
+    Главная функция, которая обрабатывает все действия и возвращает новое состояние.
+    Включает проверки на достаточность времени перед действием.
+    """
+    # Если игра уже окончена, не выполняем никаких действий
+    if state['game_over']:
+        return state
+
     new_state = _deepcopy_state(state)
 
+    # --- Действия, которые тратят время ---
+
     if action == "move":
-        if new_state['moves_made_this_round'] < 2:
+        time_cost = new_state['modifiers']['move_time_cost']
+        # Проверяем, можно ли совершить действие
+        if new_state['moves_made_this_round'] < 2 and new_state['time'] >= time_cost:
             new_state['station'] = "A" if new_state['station'] == "B" else "B"
-            new_state['time'] -= new_state['modifiers']['move_time_cost']
+            new_state['time'] -= time_cost
             new_state['moves_made_this_round'] += 1
 
     elif action == "load_contract":
-        new_state = _load_goods(new_state, kwargs['contract_id'])
-        new_state['time'] -= new_state['modifiers']['load_unload_time_cost']
+        time_cost = new_state['modifiers']['load_unload_time_cost']
+        # Проверяем, можно ли совершить действие
+        if new_state['time'] >= time_cost:
+            new_state = _load_goods(new_state, kwargs['contract_id'])
+            new_state['time'] -= time_cost
 
     elif action == "unload_contract":
-        contract_id = kwargs['contract_id']
-        price = 0
-        contract_to_remove = next((c for c in new_state['active_contracts'] if c['id'] == contract_id), None)
-        if contract_to_remove:
-            for i in range(1, 6):
-                if new_state[f"wagon_{i}_is_purchased"]:
-                    new_state[f"wagon_{i}_contents"] = [item for item in new_state[f"wagon_{i}_contents"] if
-                                                        item['contract_id'] != contract_id]
-            price = calculate_current_price(contract_to_remove)
-            new_state['completed_contracts'].append(contract_to_remove)
-            new_state['active_contracts'].remove(contract_to_remove)
-        revenue = int(price * new_state['modifiers']["revenue_multiplier"])
-        new_state['money'] += revenue
-        new_state['time'] -= new_state['modifiers']['load_unload_time_cost']
+        time_cost = new_state['modifiers']['load_unload_time_cost']
+        # Проверяем, можно ли совершить действие
+        if new_state['time'] >= time_cost:
+            contract_id = kwargs['contract_id']
+            price = 0
+            contract_to_remove = next((c for c in new_state['active_contracts'] if c['id'] == contract_id), None)
+            if contract_to_remove:
+                for i in range(1, 6):
+                    if new_state[f"wagon_{i}_is_purchased"]:
+                        new_state[f"wagon_{i}_contents"] = [item for item in new_state[f"wagon_{i}_contents"] if
+                                                            item['contract_id'] != contract_id]
+                price = calculate_current_price(contract_to_remove)
+                new_state['completed_contracts'].append(contract_to_remove)
+                new_state['active_contracts'].remove(contract_to_remove)
+            revenue = int(price * new_state['modifiers']["revenue_multiplier"])
+            new_state['money'] += revenue
+            new_state['time'] -= time_cost
+
+    # --- Действия, которые НЕ тратят время ---
 
     elif action == "buy_wagon":
         wagon_index = kwargs['wagon_index']
@@ -217,12 +245,34 @@ def perform_action(state, action, **kwargs):
         new_state[f"wagon_{wagon_index}_is_purchased"] = True
         new_state[f"wagon_{wagon_index}_hp"] = 3
 
+
     elif action == "repair_loco":
+        # Проверяем, был ли уже ремонт в этом раунде
+        if not new_state['repaired_this_round']:
+            # Если это первый ремонт, проверяем, есть ли время на его оплату
+            if new_state['time'] >= 1:
+                new_state['time'] -= 1
+                new_state['repaired_this_round'] = True
+            else:
+                # Если времени нет, действие не может быть выполнено
+                return new_state  # Возвращаем состояние без изменений
+        # Если время было списано или уже было списано ранее, продолжаем ремонт
         cost = int(REPAIR_LOCO * new_state['modifiers']['repair_cost_multiplier'])
         new_state['money'] -= cost
         new_state['loco_hp'] = 3
 
+
     elif action == "repair_wagon":
+        # Проверяем, был ли уже ремонт в этом раунде
+        if not new_state['repaired_this_round']:
+            # Если это первый ремонт, проверяем, есть ли время на его оплату
+            if new_state['time'] >= 1:
+                new_state['time'] -= 1
+                new_state['repaired_this_round'] = True
+            else:
+                # Если времени нет, действие не может быть выполнено
+                return new_state  # Возвращаем состояние без изменений
+        # Если время было списано или уже было списано ранее, продолжаем ремонт
         wagon_index = kwargs['wagon_index']
         cost = int(REPAIR_WAGON * new_state['modifiers']['repair_cost_multiplier'])
         new_state['money'] -= cost
@@ -239,25 +289,28 @@ def perform_action(state, action, **kwargs):
             new_state['contracts_pool'] = [c for c in new_state['contracts_pool'] if
                                            c['id'] != chosen_contract_orig['id']]
 
-    elif action == "end_round":
-        if new_state['time'] <= 0 and new_state['station'] == "B":
-            new_state['game_over'], new_state['game_over_reason'] = True, "Время истекло на станции Б."
-            return new_state
+    # --- Действие "Конец раунда" ---
 
+    elif action == "end_round":
+        # Проверка на проигрыш по времени была отсюда УБРАНА
         new_state['round'] += 1
         new_state['time'] = 10
         new_state['moves_made_this_round'] = 0
+        new_state['repaired_this_round'] = False
         new_state['modifiers'] = {"repair_cost_multiplier": 1.0, "move_time_cost": 2, "load_unload_time_cost": 1,
                                   "can_take_contracts": True, "revenue_multiplier": 1.0}
 
-        if not new_state['events_pool']: new_state['events_pool'] = [e.copy() for e in EVENTS]
+        if not new_state['events_pool']:
+            new_state['events_pool'] = [e.copy() for e in EVENTS]
+
         event_index = random.randrange(len(new_state['events_pool']))
         new_event = new_state['events_pool'].pop(event_index)
         new_state['current_event'] = new_event
         apply_event_effect(new_state, new_event)
         if new_state['game_over']: return new_state
 
-        for c in new_state['active_contracts']: c['rounds_left'] -= 1
+        for c in new_state['active_contracts']:
+            c['rounds_left'] -= 1
 
         if random.randint(1, 6) == 1 and new_state['loco_hp'] > 0:
             new_state['loco_hp'] -= 1
@@ -270,4 +323,11 @@ def perform_action(state, action, **kwargs):
                 new_state[f"wagon_{i}_hp"] -= 1
                 if new_state[f"wagon_{i}_hp"] <= 0:
                     new_state[f"wagon_{i}_is_purchased"], new_state[f"wagon_{i}_contents"] = False, []
+
+    # --- ЦЕНТРАЛИЗОВАННАЯ ПРОВЕРКА УСЛОВИЙ ПРОИГРЫША ---
+    # Эта проверка выполняется после ЛЮБОГО действия, изменившего состояние.
+    if new_state['time'] <= 0 and new_state['station'] == "B":
+        new_state['game_over'] = True
+        new_state['game_over_reason'] = "Время истекло, а поезд не вернулся на базу (Станция А)."
+
     return new_state
