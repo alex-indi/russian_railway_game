@@ -21,15 +21,27 @@ def get_platform_fill_html(contents, capacity):
 
 
 # --- ИНИЦИАЛИЗАЦИЯ ИГРЫ И НАСТРОЕК ---
-if 'game_settings' not in st.session_state:
-    st.session_state.game_settings = {
+def initialize_app():
+    """
+    Создает и настройки, и игровое состояние за один раз.
+    Это более надежный паттерн для многофайловых приложений на Streamlit Cloud.
+    """
+    # 1. Создаем словарь с настройками
+    settings = {
         'STARTING_MONEY': cfg.STARTING_MONEY, 'REPAIR_LOCO': cfg.REPAIR_LOCO,
         'REPAIR_WAGON': cfg.REPAIR_WAGON, 'GOODS_PRICES': cfg.GOODS_PRICES.copy(),
         'WAGON_PRICES': cfg.WAGON_PRICES.copy(), 'WAGON_INFO': cfg.WAGON_INFO,
         'GOOD_COMPATIBILITY': cfg.GOOD_COMPATIBILITY,
     }
+    st.session_state.game_settings = settings
+
+    # 2. Сразу же используем созданные настройки для инициализации игры
+    st.session_state.game_state = ge.initialize_state(settings)
+
+
+# --- ИНИЦИАЛИЗАЦИЯ ИГРЫ (Теперь всего один вызов) ---
 if 'game_state' not in st.session_state:
-    st.session_state.game_state = ge.initialize_state(st.session_state.game_settings)
+    initialize_app()
 
 # --- ОСНОВНОЙ КОД ОТРИСОВКИ ---
 st.set_page_config(layout="wide")
