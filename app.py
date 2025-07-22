@@ -55,7 +55,7 @@ with tab_game:
         st.error(f"**ИГРА ОКОНЧЕНА!**\n\nПричина: {state['game_over_reason']}")
         if st.button("Начать новую игру (с текущими настройками)"):
             st.session_state.game_state = ge.initialize_state(st.session_state.game_settings);
-            st.rerun()
+            # st.rerun()
         st.stop()
 
     # Верхняя панель (упрощена)
