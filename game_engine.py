@@ -123,9 +123,9 @@ def apply_event_effect(state, event):
         state['modifiers']["move_time_cost"] = 4
     elif event_id == "H02":
         state['modifiers']["load_unload_time_cost"] = 2
-    elif event_id in ["H03"]:
+    elif event_id == "H03":
         state['modifiers']["can_take_contracts"] = False
-    elif event_id in ["H04"]:
+    elif event_id == "H04":
         state['repaired_this_round'] = True
     elif event_id == "H05":
         state['money'] += 1000
