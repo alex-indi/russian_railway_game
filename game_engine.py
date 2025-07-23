@@ -30,14 +30,14 @@ def calculate_current_price(contract, state):
     base_price = contract_price(contract, state)
     rounds_left = contract.get('rounds_left', contract['max_rounds'])
     if contract['id'].startswith('P'):
-        if rounds_left <= 0: return int(base_price * 0.2)
-        if rounds_left == 1: return int(base_price * 0.6)
-        if rounds_left == 2: return int(base_price * 0.9)
-    elif contract['id'].startswith('M'):
-        if rounds_left <= 0: return int(base_price * 0.3)
-        if rounds_left == 1: return int(base_price * 0.7)
-    elif contract['id'].startswith('S'):
         if rounds_left <= 0: return int(base_price * 0.4)
+        if rounds_left == 1: return int(base_price * 0.6)
+        if rounds_left == 2: return int(base_price * 0.8)
+    elif contract['id'].startswith('M'):
+        if rounds_left <= 0: return int(base_price * 0.4)
+        if rounds_left == 1: return int(base_price * 0.6)
+    elif contract['id'].startswith('S'):
+        if rounds_left <= 0: return int(base_price * 0.5)
     return base_price
 
 
@@ -123,8 +123,10 @@ def apply_event_effect(state, event):
         state['modifiers']["move_time_cost"] = 4
     elif event_id == "H02":
         state['modifiers']["load_unload_time_cost"] = 2
-    elif event_id in ["H03", "H04"]:
+    elif event_id in ["H03"]:
         state['modifiers']["can_take_contracts"] = False
+    elif event_id in ["H04"]:
+        state['repaired_this_round'] = True
     elif event_id == "H05":
         state['money'] += 1000
     elif event_id == "H06":
