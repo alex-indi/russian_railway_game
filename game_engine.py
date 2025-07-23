@@ -199,11 +199,7 @@ def perform_action(state, action, **kwargs):
                 if new_state[f"wagon_{i}_is_purchased"]:
                     new_state[f"wagon_{i}_contents"] = [item for item in new_state[f"wagon_{i}_contents"] if
                                                         item['contract_id'] != contract_id]
-
-            # --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
             price = calculate_current_price(contract_to_remove, new_state)  # Передаем new_state
-            # --- КОНЕЦ ИСПРАВЛЕНИЯ ---
-
             new_state['completed_contracts'].append(contract_to_remove)
             new_state['active_contracts'].remove(contract_to_remove)
         revenue = int(price * new_state['modifiers']["revenue_multiplier"])

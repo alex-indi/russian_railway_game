@@ -112,7 +112,7 @@ with tab_game:
             st.markdown("<hr style='margin:0.1rem 0'>", unsafe_allow_html=True)
 
         st.markdown("")
-        if state['moves_made_this_round'] == 0 and state['station'] == 'A':
+        if state['moves_made_this_round'] == 0 and state['station'] == 'A' and not state['repaired_this_round']:
             with st.container(border=True):
                 st.markdown("##### Предрейсовое обслуживание");
                 needs_repair = False
@@ -142,7 +142,6 @@ with tab_game:
 
     with col2:  # КОЛОНКА КОНТРАКТОВ
         st.markdown("#### Активные контракты")
-        # ... (Код отрисовки активных контрактов, без изменений) ...
         if not state['active_contracts']:
             st.info("У вас нет активных контрактов.")
         else:
@@ -212,7 +211,6 @@ with tab_game:
                 st.session_state.game_state = ge.perform_action(state, "end_round");
                 st.rerun()
 
-            # --- ИЗМЕНЕНИЕ: Кнопка "Новая игра" возвращена сюда ---
             st.markdown("---")
             if st.button("Начать новую игру", type="secondary", use_container_width=True):
                 st.session_state.confirm_restart_ingame = True
